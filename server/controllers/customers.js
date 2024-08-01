@@ -1,5 +1,6 @@
 import { db } from "../db.js";
 import bcrypt from "bcrypt";
+import { generateToken } from "../jwt.js";
 
 export const registerCustomer = async (req, res) => {
   try {
@@ -27,12 +28,20 @@ export const loginCustomer = async (req, res) => {
       const isMatch = await bcrypt.compare(password, customer.password);
       if (!isMatch) {
         return res
-          .status(201)
-          .json({ status: "success", message: "Login Successfully.." });
-      } else {
-        return res
           .status(401)
           .json({ status: "failed", message: "Check the credentials" });
+      } else {
+        const token = await generateToken({ name: customer.name });
+        let options = {
+          maxAge: 1000 * 60 * 15, // expire after 15 minutes
+          httpOnly: true, // Cookie will not be exposed to client side code
+          sameSite: "none", // If client and server origins are different
+          secure: true, // use with HTTPS only
+        };
+        res.cookie("token", token, options);
+        return res
+          .status(201)
+          .json({ status: "success", message: "Login Successfully.." });
       }
     }
   } catch (error) {

@@ -2,6 +2,8 @@ import express from "express";
 import client from "./db.js";
 import customerRouter from "./routers/customerRouter.js";
 import workerRouter from "./routers/workerRouter.js";
+import dotenv from "dotenv"
+dotenv.config()
 
 const app = express();
 
