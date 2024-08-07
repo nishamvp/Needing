@@ -2,7 +2,7 @@ import { db } from "../db.js";
 import bcrypt from "bcrypt";
 import { generateEmailToken, generateToken, verifyEmail } from "../jwt.js";
 import nodemailer from "nodemailer";
-import { CUSTOMER_COLLECTION, VERIFY_URL } from "../constants.js";
+import { CUSTOMER_COLLECTION, VERIFY_CUSTOMER_URL } from "../constants.js";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -15,7 +15,9 @@ const transporter = nodemailer.createTransport({
 export const registerCustomer = async (req, res) => {
   try {
     const { name, phone, email, location, password } = req.body;
-    const isUserExist = await db.collection(CUSTOMER_COLLECTION).findOne({ email });
+    const isUserExist = await db
+      .collection(CUSTOMER_COLLECTION)
+      .findOne({ email });
     if (isUserExist)
       return res
         .status(403)
@@ -29,8 +31,11 @@ export const registerCustomer = async (req, res) => {
     const user = await db
       .collection(CUSTOMER_COLLECTION)
       .findOne({ _id: createUser.insertedId });
-    const emailToken = await generateEmailToken(email);
-    const verificationUrl = VERIFY_URL+emailToken;
+    const emailToken = await generateEmailToken({
+      email: email,
+      role: "customer",
+    });
+    const verificationUrl = VERIFY_CUSTOMER_URL + emailToken;
     const mailOptions = {
       from: "nishamvp30@gmail.com",
       to: user.email,
@@ -61,13 +66,11 @@ export const emailVerification = async (req, res) => {
       const verifyingUser = await db
         .collection(CUSTOMER_COLLECTION)
         .updateOne({ _id: user._id }, { $set: { verified: true } });
-      return res
-        .status(200)
-        .json({
-          status: "success",
-          message: "Email verified successfully",
-          verifyingUser,
-        });
+      return res.status(200).json({
+        status: "success",
+        message: "Email verified successfully",
+        verifyingUser,
+      });
     }
   } catch (error) {
     console.log(error);
@@ -78,7 +81,9 @@ export const emailVerification = async (req, res) => {
 export const loginCustomer = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const customer = await db.collection(CUSTOMER_COLLECTION).findOne({ email: email });
+    const customer = await db
+      .collection(CUSTOMER_COLLECTION)
+      .findOne({ email: email });
     if (!customer) {
       return res
         .status(403)
@@ -90,7 +95,10 @@ export const loginCustomer = async (req, res) => {
           .status(401)
           .json({ status: "failed", message: "Check the credentials" });
       } else {
-        const token = await generateToken({ name: customer.email });
+        const token = await generateToken({
+          email: customer.email,
+          role: "customer",
+        });
         let options = {
           maxAge: 1000 * 60 * 15,
           httpOnly: true,

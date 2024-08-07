@@ -5,8 +5,8 @@ export const generateToken = async (user) => {
   return token;
 };
 
-export const generateEmailToken = async (email) => {
-  const token = jwt.sign({ email }, process.env.EMAIL_SECRET_KEY, {
+export const generateEmailToken = async (emailUser) => {
+  const token = jwt.sign(emailUser, process.env.EMAIL_SECRET_KEY, {
     expiresIn: "1h",
   });
   return token;
