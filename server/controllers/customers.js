@@ -5,6 +5,7 @@ import {
   generateToken,
   verifyEmail,
   generateAccessToken,
+  verifyRefreshToken,
 } from "../jwt/jwt.js";
 import nodemailer from "nodemailer";
 import { CUSTOMER_COLLECTION, VERIFY_CUSTOMER_URL } from "../constants.js";
@@ -133,7 +134,7 @@ export const loginCustomer = async (req, res) => {
     res.cookie("token", token, options);
 
     // Set the access token in the response header
-    res.setHeader("Access-Token", accessToken);
+    res.setHeader("access-Token", accessToken);
 
     return res.status(201).json({
       status: "success",
@@ -142,5 +143,57 @@ export const loginCustomer = async (req, res) => {
   } catch (error) {
     console.error("Login failed:", error);
     return res.status(500).json({ message: "Failed to login" });
+  }
+};
+
+export const refreshToken = async (req, res) => {
+  try {
+    const refreshToken = req.cookies.token;
+
+    // Check if refresh token exists
+    if (!refreshToken) {
+      return res
+        .status(401)
+        .json({ status: 'failed', message: 'No token found' });
+    }
+
+    // Verify the refresh token
+    const { err, decoded } = await verifyRefreshToken(refreshToken);
+
+    if (err) {
+      return res
+        .status(401)
+        .json({ status: 'failed', message: 'Invalid token' });
+    }
+
+    // Find the customer associated with the token
+    const customer = await db
+      .collection(CUSTOMER_COLLECTION)
+      .findOne({ email: decoded.email });
+
+    if (!customer) {
+      return res
+        .status(404)
+        .json({ status: 'failed', message: 'Customer not found' });
+    }
+
+    // Generate a new access token
+    const newAccessToken = await generateAccessToken({
+      email: customer.email,
+      role: 'customer',
+    });
+
+    // Set the new access token in the response header
+    res.setHeader('access-token', newAccessToken);
+
+    // Send a successful response
+    return res
+      .status(200)
+      .json({ status: 'success', message: 'Access token refreshed' });
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    return res
+      .status(500)
+      .json({ status: 'error', message: 'Internal server error' });
   }
 };
