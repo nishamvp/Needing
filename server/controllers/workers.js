@@ -1,6 +1,11 @@
 import { db } from "../db.js";
 import bcrypt from "bcrypt";
-import { generateEmailToken, generateToken, verifyEmail } from "../jwt.js";
+import {
+  generateEmailToken,
+  generateToken,
+  verifyEmail,
+  generateAccessToken,
+} from "../jwt/jwt.js";
 import nodemailer from "nodemailer";
 import { WORKERS_COLLECTION, VERIFY_WORKER_URL } from "../constants.js";
 
@@ -13,8 +18,12 @@ const transporter = nodemailer.createTransport({
 });
 
 export const registerWorker = async (req, res) => {
+  const { name, email, password } = req.body;
   try {
-    const { name, phone, email, location, password } = req.body;
+    if (!email || !password || !name)
+      return res
+        .status(401)
+        .json({ status: "Failed", message: "No credential given" });
     const isUserExist = await db
       .collection(WORKERS_COLLECTION)
       .findOne({ email });
@@ -27,7 +36,7 @@ export const registerWorker = async (req, res) => {
     const hashPassword = await bcrypt.hash(password, salt);
     const createUser = await db
       .collection(WORKERS_COLLECTION)
-      .insertOne({ name, phone, email, location, password: hashPassword });
+      .insertOne({ name, email, password: hashPassword });
     const user = await db
       .collection(WORKERS_COLLECTION)
       .findOne({ _id: createUser.insertedId });
@@ -79,8 +88,12 @@ export const WorkerEmailVerification = async (req, res) => {
 };
 
 export const loginWorker = async (req, res) => {
+  const { email, password } = req.body;
   try {
-    const { email, password } = req.body;
+    if (!email || !password)
+      return res
+        .status(401)
+        .json({ status: "Failed", message: "No credential given" });
     const customer = await db
       .collection(WORKERS_COLLECTION)
       .findOne({ email: email });
@@ -97,18 +110,31 @@ export const loginWorker = async (req, res) => {
       } else {
         const token = await generateToken({
           email: customer.email,
-          role: "worker",
+          role: "customer",
         });
-        let options = {
-          maxAge: 1000 * 60 * 15,
+
+        const accessToken = await generateAccessToken({
+          email: customer.email,
+          role: "customer",
+        });
+
+        const options = {
+          maxAge: 1000 * 60 * 15, // 15 minutes
           httpOnly: true,
-          sameSite: "none",
-          secure: true,
+          sameSite: "none", // Adjust according to your needs
+          secure: process.env.NODE_ENV === "production", // Use secure cookies only in production
         };
+
+        // Set the token as a cookie
         res.cookie("token", token, options);
-        return res
-          .status(201)
-          .json({ status: "success", message: "Login Successfully.." });
+
+        // Set the access token in the response header
+        res.setHeader("Access-Token", accessToken);
+
+        return res.status(201).json({
+          status: "success",
+          message: "Login successfully",
+        });
       }
     }
   } catch (error) {

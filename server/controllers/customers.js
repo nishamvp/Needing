@@ -1,6 +1,11 @@
 import { db } from "../db.js";
 import bcrypt from "bcrypt";
-import { generateEmailToken, generateToken, verifyEmail } from "../jwt.js";
+import {
+  generateEmailToken,
+  generateToken,
+  verifyEmail,
+  generateAccessToken,
+} from "../jwt/jwt.js";
 import nodemailer from "nodemailer";
 import { CUSTOMER_COLLECTION, VERIFY_CUSTOMER_URL } from "../constants.js";
 
@@ -13,8 +18,12 @@ const transporter = nodemailer.createTransport({
 });
 
 export const registerCustomer = async (req, res) => {
+  const { name, email, password } = req.body;
   try {
-    const { name, phone, email, location, password } = req.body;
+    if (!email || !password || !name)
+      return res
+        .status(401)
+        .json({ status: "Failed", message: "No credential given" });
     const isUserExist = await db
       .collection(CUSTOMER_COLLECTION)
       .findOne({ email });
@@ -27,7 +36,7 @@ export const registerCustomer = async (req, res) => {
     const hashPassword = await bcrypt.hash(password, salt);
     const createUser = await db
       .collection(CUSTOMER_COLLECTION)
-      .insertOne({ name, phone, email, location, password: hashPassword });
+      .insertOne({ name, email, password: hashPassword });
     const user = await db
       .collection(CUSTOMER_COLLECTION)
       .findOne({ _id: createUser.insertedId });
@@ -81,37 +90,57 @@ export const emailVerification = async (req, res) => {
 export const loginCustomer = async (req, res) => {
   try {
     const { email, password } = req.body;
+    if (!email || !password)
+      return res
+        .status(401)
+        .json({ status: "Failed", message: "No credential given" });
     const customer = await db
       .collection(CUSTOMER_COLLECTION)
       .findOne({ email: email });
+
     if (!customer) {
       return res
         .status(403)
-        .json({ status: "failed", Message: "Register first" });
-    } else {
-      const isMatch = await bcrypt.compare(password, customer.password);
-      if (!isMatch) {
-        return res
-          .status(401)
-          .json({ status: "failed", message: "Check the credentials" });
-      } else {
-        const token = await generateToken({
-          email: customer.email,
-          role: "customer",
-        });
-        let options = {
-          maxAge: 1000 * 60 * 15,
-          httpOnly: true,
-          sameSite: "none",
-          secure: true,
-        };
-        res.cookie("token", token, options);
-        return res
-          .status(201)
-          .json({ status: "success", message: "Login Successfully.." });
-      }
+        .json({ status: "failed", message: "Register first" });
     }
+
+    const isMatch = await bcrypt.compare(password, customer.password);
+
+    if (!isMatch) {
+      return res
+        .status(401)
+        .json({ status: "failed", message: "Check the credentials" });
+    }
+
+    const token = await generateToken({
+      email: customer.email,
+      role: "customer",
+    });
+
+    const accessToken = await generateAccessToken({
+      email: customer.email,
+      role: "customer",
+    });
+
+    const options = {
+      maxAge: 1000 * 60 * 15, // 15 minutes
+      httpOnly: true,
+      sameSite: "none", // Adjust according to your needs
+      secure: process.env.NODE_ENV === "production", // Use secure cookies only in production
+    };
+
+    // Set the token as a cookie
+    res.cookie("token", token, options);
+
+    // Set the access token in the response header
+    res.setHeader("Access-Token", accessToken);
+
+    return res.status(201).json({
+      status: "success",
+      message: "Login successfully",
+    });
   } catch (error) {
-    res.status(500).json({ message: "Failed to login " });
+    console.error("Login failed:", error);
+    return res.status(500).json({ message: "Failed to login" });
   }
 };
