@@ -139,6 +139,7 @@ export const loginCustomer = async (req, res) => {
     return res.status(201).json({
       status: "success",
       message: "Login successfully",
+      accessToken,
     });
   } catch (error) {
     console.error("Login failed:", error);
@@ -154,7 +155,7 @@ export const refreshToken = async (req, res) => {
     if (!refreshToken) {
       return res
         .status(401)
-        .json({ status: 'failed', message: 'No token found' });
+        .json({ status: "failed", message: "No token found" });
     }
 
     // Verify the refresh token
@@ -163,7 +164,7 @@ export const refreshToken = async (req, res) => {
     if (err) {
       return res
         .status(401)
-        .json({ status: 'failed', message: 'Invalid token' });
+        .json({ status: "failed", message: "Invalid token" });
     }
 
     // Find the customer associated with the token
@@ -174,26 +175,35 @@ export const refreshToken = async (req, res) => {
     if (!customer) {
       return res
         .status(404)
-        .json({ status: 'failed', message: 'Customer not found' });
+        .json({ status: "failed", message: "Customer not found" });
     }
 
     // Generate a new access token
     const newAccessToken = await generateAccessToken({
       email: customer.email,
-      role: 'customer',
+      role: "customer",
     });
 
     // Set the new access token in the response header
-    res.setHeader('access-token', newAccessToken);
+    res.setHeader("access-token", newAccessToken);
 
     // Send a successful response
     return res
       .status(200)
-      .json({ status: 'success', message: 'Access token refreshed' });
+      .json({ status: "success", message: "Access token refreshed" });
   } catch (error) {
-    console.error('Error refreshing token:', error);
     return res
       .status(500)
-      .json({ status: 'error', message: 'Internal server error' });
+      .json({ status: "error", message: "Refresh-token expired" });
+  }
+};
+
+export const getServices = async (req, res) => {
+  try {
+    res.status(200).json({ message: "reached here services api" });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ status: "error", message: "Internal server error" });
   }
 };

@@ -3,11 +3,13 @@ import client from "./db.js";
 import customerRouter from "./routers/customerRouter.js";
 import workerRouter from "./routers/workerRouter.js";
 import dotenv from "dotenv"
+import cookieParser from "cookie-parser";
 dotenv.config()
 
 const app = express();
 
 app.use(express.json());
+app.use(cookieParser())
 
 app.use("/customer", customerRouter);
 app.use("/worker", workerRouter);

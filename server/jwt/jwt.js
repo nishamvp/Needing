@@ -1,12 +1,12 @@
 import jwt from "jsonwebtoken";
 
 export const generateToken = async (user) => {
-  const token = jwt.sign(user, process.env.JWT_SECRET_KEY, { expiresIn: "7d" });
+  const token = jwt.sign(user, process.env.JWT_SECRET_KEY, { expiresIn: "1m" });
   return token;
 };
 export const generateAccessToken = async (user) => {
   const token = jwt.sign(user, process.env.JWT_ACCESS_SECRET_KEY, {
-    expiresIn: "15m",
+    expiresIn: "40s",
   });
   return token;
 };
@@ -31,8 +31,8 @@ export const verifyEmail = async (token) => {
 
 export const verifyAccessToken = async (req, res, next) => {
   const accessToken = req.headers["access-token"];
-  
-  if (!accessToken ) {
+
+  if (!accessToken) {
     return res.status(401).json({ message: "There is no token provided" });
   }
 
@@ -46,17 +46,18 @@ export const verifyAccessToken = async (req, res, next) => {
     // Proceed to the next middleware or route handler
     next();
   } catch (error) {
-    console.error("Access token verification failed:", error);
     return res.status(401).json({ message: "Invalid access token" });
   }
 };
 
 export const verifyRefreshToken = async (token) => {
-  const verify = await jwt.verify(
-    token,
-    process.env.JWT_SECRET_KEY,
-    (err, decoded) => {
-      return { err, decoded };
-    }
-  );
+  return new Promise((resolve, reject) => {
+    jwt.verify(token, process.env.JWT_SECRET_KEY, (err, decoded) => {
+      if (err) {
+        reject({ err, decoded });
+      } else {
+        resolve({ err, decoded });
+      }
+    });
+  });
 };
