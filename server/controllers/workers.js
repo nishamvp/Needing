@@ -7,7 +7,11 @@ import {
   generateAccessToken,
 } from "../jwt/jwt.js";
 import nodemailer from "nodemailer";
-import { WORKERS_COLLECTION, VERIFY_WORKER_URL } from "../constants.js";
+import {
+  WORKERS_COLLECTION,
+  VERIFY_WORKER_URL,
+  WORKERS_SERVICES_COLLECTION,
+} from "../constants.js";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -54,7 +58,7 @@ export const registerWorker = async (req, res) => {
     await transporter.sendMail(mailOptions);
     res.status(201).json(createUser);
   } catch (error) {
-    res.status(500).json({ message: "Failed to register customer" });
+    res.status(500).json({ message: "Failed to register worker" });
   }
 };
 
@@ -94,28 +98,28 @@ export const loginWorker = async (req, res) => {
       return res
         .status(401)
         .json({ status: "Failed", message: "No credential given" });
-    const customer = await db
+    const worker = await db
       .collection(WORKERS_COLLECTION)
       .findOne({ email: email });
-    if (!customer) {
+    if (!worker) {
       return res
         .status(403)
         .json({ status: "failed", Message: "Register first" });
     } else {
-      const isMatch = await bcrypt.compare(password, customer.password);
+      const isMatch = await bcrypt.compare(password, worker.password);
       if (!isMatch) {
         return res
           .status(401)
           .json({ status: "failed", message: "Check the credentials" });
       } else {
         const token = await generateToken({
-          email: customer.email,
-          role: "customer",
+          email: worker.email,
+          role: "worker",
         });
 
         const accessToken = await generateAccessToken({
-          email: customer.email,
-          role: "customer",
+          email: worker.email,
+          role: "worker",
         });
 
         const options = {
@@ -139,5 +143,24 @@ export const loginWorker = async (req, res) => {
     }
   } catch (error) {
     res.status(500).json({ message: "Failed to login " });
+  }
+};
+
+export const addServices = async (req, res) => {
+  try {
+    const { serviceTitle, description, experience, payment } = req.body;
+    const addService = await db
+      .collection(WORKERS_SERVICES_COLLECTION)
+      .insertOne({ serviceTitle, description, experience, payment });
+    return res
+      .status(201)
+      .json({
+        status: "success",
+        message: "Service added successfully",
+        service: addService,
+      });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Something went wrong", status: "failed" });
   }
 };
