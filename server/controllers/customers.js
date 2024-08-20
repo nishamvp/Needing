@@ -8,7 +8,13 @@ import {
   verifyRefreshToken,
 } from "../jwt/jwt.js";
 import nodemailer from "nodemailer";
-import { CUSTOMER_COLLECTION, VERIFY_CUSTOMER_URL } from "../constants.js";
+import {
+  CUSTOMER_COLLECTION,
+  VERIFY_CUSTOMER_URL,
+  WORKERS_COLLECTION,
+  WORKERS_SERVICES_COLLECTION,
+} from "../constants.js";
+import { ObjectId } from "mongodb";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -124,9 +130,8 @@ export const loginCustomer = async (req, res) => {
     });
 
     const options = {
-      maxAge: 1000 * 60 * 15, // 15 minutes
       httpOnly: true,
-      sameSite: "none", // Adjust according to your needs
+      sameSite: "Lax", // Adjust according to your needs
       secure: process.env.NODE_ENV === "production", // Use secure cookies only in production
     };
 
@@ -199,9 +204,41 @@ export const refreshToken = async (req, res) => {
 };
 
 export const getServices = async (req, res) => {
+  const { email } = req.user;
+
   try {
-    res.status(200).json({ message: "reached here services api" });
+    // Find the customer by email
+    const customer = await db
+      .collection(CUSTOMER_COLLECTION)
+      .findOne({ email });
+
+    if (!customer) {
+      return res
+        .status(404)
+        .json({ status: "error", message: "Customer not found" });
+    }
+
+    // Find workers in the same location as the customer
+    const workersInLocation = await db
+      .collection(WORKERS_COLLECTION)
+      .find({ location: customer.location })
+      .toArray(); // Convert cursor to array
+
+    // Find services using the workerIds
+    const workerIds = workersInLocation.map((worker) => worker._id.toString());
+    console.log(workerIds)
+    const services = await db
+      .collection(WORKERS_SERVICES_COLLECTION)
+      .find({
+        workerId: { $in: workerIds },
+      })
+      .toArray();
+      // console.log(services)
+
+    // Return the found services to the client
+    return res.status(200).json({ status: "success", services });
   } catch (error) {
+    console.error("Error retrieving services:", error);
     return res
       .status(500)
       .json({ status: "error", message: "Internal server error" });

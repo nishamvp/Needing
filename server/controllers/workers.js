@@ -123,9 +123,8 @@ export const loginWorker = async (req, res) => {
         });
 
         const options = {
-          maxAge: 1000 * 60 * 15, // 15 minutes
           httpOnly: true,
-          sameSite: "none", // Adjust according to your needs
+          sameSite: "Lax", // Adjust according to your needs
           secure: process.env.NODE_ENV === "production", // Use secure cookies only in production
         };
 
@@ -147,20 +146,31 @@ export const loginWorker = async (req, res) => {
 };
 
 export const addServices = async (req, res) => {
+  const { serviceTitle, description, experience, payment } = req.body;
   try {
-    const { serviceTitle, description, experience, payment } = req.body;
+    if (!serviceTitle || !description || !experience || !payment)
+      return res
+        .status(400)
+        .json({ message: "Credentials are not given", status: "failed" });
+    const worker = await db
+      .collection(WORKERS_COLLECTION)
+      .findOne({ email: req.user.email });
     const addService = await db
       .collection(WORKERS_SERVICES_COLLECTION)
-      .insertOne({ serviceTitle, description, experience, payment });
-    return res
-      .status(201)
-      .json({
-        status: "success",
-        message: "Service added successfully",
-        service: addService,
+      .insertOne({
+        serviceTitle,
+        description,
+        experience,
+        payment,
+        workerId: worker._id,
+        location: worker.location,
       });
+    return res.status(201).json({
+      status: "success",
+      message: "Service added successfully",
+      service: addService,
+    });
   } catch (error) {
-    console.log(error);
     res.status(500).json({ message: "Something went wrong", status: "failed" });
   }
 };
