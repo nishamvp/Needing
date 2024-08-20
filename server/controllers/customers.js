@@ -89,7 +89,6 @@ export const emailVerification = async (req, res) => {
       });
     }
   } catch (error) {
-    console.log(error);
     res.status(500).json({ message: "Something went wrong" });
   }
 };
@@ -226,14 +225,12 @@ export const getServices = async (req, res) => {
 
     // Find services using the workerIds
     const workerIds = workersInLocation.map((worker) => worker._id.toString());
-    console.log(workerIds)
     const services = await db
       .collection(WORKERS_SERVICES_COLLECTION)
       .find({
         workerId: { $in: workerIds },
       })
       .toArray();
-      // console.log(services)
 
     // Return the found services to the client
     return res.status(200).json({ status: "success", services });
