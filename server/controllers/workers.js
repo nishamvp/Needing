@@ -11,6 +11,7 @@ import {
   WORKERS_COLLECTION,
   VERIFY_WORKER_URL,
   WORKERS_SERVICES_COLLECTION,
+  LOCATION_COLLECTION,
 } from "../constants.js";
 
 const transporter = nodemailer.createTransport({
@@ -174,3 +175,39 @@ export const addServices = async (req, res) => {
     res.status(500).json({ message: "Something went wrong", status: "failed" });
   }
 };
+
+export const addProfile = async (req, res) => {
+  const { location, services } = req.body;
+  const { email } = req.user;
+
+  try {
+    // Get workerId using the user object
+    const worker = await db.collection(WORKERS_COLLECTION).findOne({ email });
+    if (!worker) {
+      return res.status(404).json({ message: 'Worker not found' });
+    }
+
+    const workerId = worker._id.toString();
+
+    // Add location to the Location collection
+    await db.collection(LOCATION_COLLECTION).insertOne({
+      workerId,
+      coordinates: [location.longitude, location.latitude],
+    });
+
+    // Add services to the Workers Services collection
+    await db.collection(WORKERS_SERVICES_COLLECTION).insertMany(
+      services.map((service) => ({
+        ...service,
+        workerId,
+      }))
+    );
+
+    // Send a success response
+    return res.status(201).json({ message: 'Profile added successfully' });
+  } catch (error) {
+    console.error('Error adding profile:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
